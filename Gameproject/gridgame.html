@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    body {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        margin: 0;
+    }
+
+    .grid {
+        display: flex;
+        flex-wrap: wrap;
+        border: solid 1px;
+        width: 600px;
+        height: 600px;
+    }
+
+    .grid div {
+        width: 40px;
+        height: 40px;
+        /* border: solid 1px; */
+        box-sizing: border-box;
+        position: relative;
+    }
+
+    .shooter {
+        background-image: url(/Gameproject/invaders.jpg);
+        background-size: cover;
+        background-color: blue;
+    }
+
+    .invader {
+        background-image: url(/Gameproject/s.png);
+        background-size: cover;
+        /* background-color: brown; */
+    }
+
+    .boom {
+        background-color: red;
+
+    }
+
+    .laser {
+        border-left: solid 5px orange;
+        /* background-color: orange; */
+        position: absolute;
+        left: 17px;
+    }
+
+    .laser2 {
+        border-left: solid 5px red;
+        /* background-color: orange; */
+        position: absolute;
+        left: 17px;
+    }
+</style>
+
+<body>
+    <h2>score:<span id="result"></span></h2>
+    <div class="grid"></div>
+</body>
+
+</html>
+<script>
+    // 15 x 15칸 만들기
+    for (let i = 0; i < 210; i++) {
+        // div 요소 생성
+        const divElement = document.createElement("div");
+        // grid에 div 요소 추가
+        const grid = document.querySelector(".grid");
+        grid.appendChild(divElement);
+    }
+
+    // 브라우저가 HTML을 전부 읽고 DOM 트리를 완성하자마자 발생하는 이벤트
+    document.addEventListener("DOMContentLoaded", () => {
+        const squares = document.querySelectorAll(".grid div");
+        const resultDisplay = document.querySelector("#result");
+        let width = 15;//게임보드 가로길이
+        let currentShooterIndex = 202;// 현재전투기 초기위치 
+        let currentInvaderIndex = 0;//현재 외계인 위치
+        let alienInvadersTakenDown = [];// 격추된 외계인 저장할 배열
+        let result = 0;//게임점수 저장
+        let direction = 1;// 외계인 이동방향 
+        let invaderId;
+
+        // invaders 정의하기, 15 x 15칸에 0부터 시작하는 30개 뭉치
+        const alienInvaders = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 30,
+            31, 32, 33, 34, 35, 36, 37, 38, 39,
+        ];
+        // const alienInvaders = [
+        //     0, 1, 2, 3, 4,   17, 18,  20, 21, 30,
+        //     31, 32, 33,  37, 38, 39,40,45,53,58,68,72,98,105,124,
+        //     134
+        // ];
+
+        // invaders 그리기, 모든 칸이 들어있는 배열 squares에서 invader에 해당하는 칸만 style 적용
+        alienInvaders.forEach((invader) =>
+            squares[currentInvaderIndex + invader].classList.add("invader")
+        );
+
+        // shooter 그리기
+        squares[currentShooterIndex].classList.add("shooter");
+
+        // shooter 움직이기
+        function moveShooter(e) {
+            // 예전 위치 지우기
+            squares[currentShooterIndex].classList.remove("shooter");
+            // 이벤트 요소의 키값 비교하기
+            switch (e.key) {
+                case "ArrowLeft":
+                    // 인덱스 범위 안에서만 움직이게 하기
+                    // 인덱스 범위 안에서만 움직이게 하기( 왼쪽으로 1칸이동)
+                    // 왼쪽벽인덱스 위치 195임  196 % 15 = 0  이범위 넘어가지않을때 움직일수있도록
+                    if (currentShooterIndex % width !== 0) currentShooterIndex -= 1;
+                    break;
+                case "ArrowRight":
+                    // 인덱스 범위 안에서만 움직이게 하기
+                    // 인덱스 범위 안에서만 움직이게 하기( 오른쪽으로 1칸이동)
+                    //width = 15//게임보드 가로길이
+                    //오른쪽벽 인덱스 위치 209 %15 =14(width-1)  이범위보다 작을떄 움직일수있도록
+                    if (currentShooterIndex % width < width - 1) currentShooterIndex += 1;
+                    break;
+                case "ArrowUp":
+                    currentShooterIndex -= width
+                    break;
+                case "ArrowDown":
+                    currentShooterIndex += width
+                    break;
+            }
+            squares[currentShooterIndex].classList.add("shooter");
+        }
+        document.addEventListener("keydown", moveShooter);// 키를 눌렀을떄 함수 호출하여 전투기 이동
+
+        // invaders 움직이기
+        function moveInvaders() {
+            const leftEdge = alienInvaders[0] % width === 0;// 외계인 첫번쨰인덱스위치 활용하여 왼쪽끝 인덱스 위치 
+            const rightEdge = alienInvaders[alienInvaders.length - 1] % width === width - 1;
+
+            // 왼쪽 벽이면서 왼쪽으로 가려할 때, 혹은 오른쪽 벽이면서 오른쪽으로 가려할 때
+            if ((leftEdge && direction === -1) || (rightEdge && direction === 1)) {
+                // invaders 전체를 밑으로 내려주기
+                direction = width
+            } else if (direction === width) {
+                if (leftEdge) direction = 1
+                else direction = -1
+            }
+            for (let i = 0; i <= alienInvaders.length - 1; i++) {
+                squares[alienInvaders[i]].classList.remove('invader')
+            }
+            for (let i = 0; i <= alienInvaders.length - 1; i++) {
+                alienInvaders[i] += direction
+            }
+            for (let i = 0; i <= alienInvaders.length - 1; i++) {
+                // 레이저에 맞지 않았다면 
+                if (!alienInvadersTakenDown.includes(i)) {
+                    squares[alienInvaders[i]].classList.add('invader')
+                }
+            }
+
+            // game over 정의하기
+            // shooter가 있는 인덱스에 클래스가 invader, shooter 둘다 있다면 game over
+            if (squares[currentShooterIndex].classList.contains('invader', 'shooter')) {
+                resultDisplay.textContent = 'Game Over'
+                squares[currentShooterIndex].classList.add('boom')
+
+
+                clearInterval(invaderId)
+            }
+
+            for (let i = 0; i <= alienInvaders.length - 1; i++) {
+                // invaders의 인덱스가 grid의 마지막 줄보다 크다면 game over
+                if (alienInvaders[i] > (squares.length - (width - 1))) {
+                    resultDisplay.textContent = 'Game Over'
+                    clearInterval(invaderId)
+                }
+            }
+
+            // 이겼을 때
+            if (alienInvadersTakenDown.length === alienInvaders.length) {
+                resultDisplay.textContent = 'You Win'
+                clearInterval(invaderId)
+            }
+
+        }
+        invaderId = setInterval(moveInvaders, 500)
+
+        // invader에게 레이저 쏘기
+        function shoot(e) {
+            let laserId
+            let currentLaserIndex = currentShooterIndex
+
+            // shooter에서부터 레이저 나가기
+            function moveLaser() {
+                squares[currentLaserIndex].classList.remove('laser')
+                // 레이저의 행 이동
+                currentLaserIndex -= width
+                squares[currentLaserIndex].classList.add('laser')
+                // 만약 invader가 레이저에 맞았다면
+                if (squares[currentLaserIndex].classList.contains('invader')) {
+                    squares[currentLaserIndex].classList.remove('laser')
+                    squares[currentLaserIndex].classList.remove('invader')
+                    squares[currentLaserIndex].classList.add('boom')
+
+                    setTimeout(() => squares[currentLaserIndex].classList.remove('boom'), 250)
+                    clearInterval(laserId)
+
+                    // invaders 배열에 레이저 인덱스가 있다면 alienInvadersTakenDown에 추가하기
+                    const alienTakenDown = alienInvaders.indexOf(currentLaserIndex)
+                    alienInvadersTakenDown.push(alienTakenDown)
+                    result++
+                    resultDisplay.textContent = result
+                }
+
+                // 레이저는 빠르게 사라지기
+                if (currentLaserIndex < width) {
+                    clearInterval(laserId)
+                    setTimeout(() => squares[currentLaserIndex].classList.remove('laser'), 100)
+                }
+            }
+            switch (e.code) {
+                case 'Space':
+                    laserId = setInterval(moveLaser, 100)
+                    break
+            }
+        }
+
+
+        function inshoot(e) {
+            let laserId2
+            let currentLaserIndex2 = alienInvaders[Math.floor(Math.random() * alienInvaders.length)]
+            laserId2 = setInterval(moveLaser2, 100)
+            // shooter에서부터 레이저 나가기
+            function moveLaser2() {
+
+                squares[currentLaserIndex2].classList.remove('laser2')
+                // 레이저의 행 이동
+                currentLaserIndex2 += width*2
+                squares[currentLaserIndex2].classList.add('laser2')
+                // 만약 invader가 레이저에 맞았다면
+                if (squares[currentLaserIndex2].classList.contains('shooter')) {
+                    squares[currentLaserIndex2].classList.remove('laser2')
+                    squares[currentLaserIndex2].classList.remove('shooter')
+                    squares[currentLaserIndex2].classList.add('boom')
+
+                    if (squares[currentLaserIndex2].classList.contains('boom')) {
+                        resultDisplay.textContent = 'Game Over'
+                       
+                        var result =confirm("재시작하실?")
+                        
+                        if(result){
+                            location.reload();
+                        clearInterval(invaderId)
+                        }else{
+                            location.reload();
+                        }
+                    
+                        
+
+                        
+                    }
+
+                    setTimeout(() => squares[currentLaserIndex2].classList.remove('boom'), 250)
+                    clearInterval(laserId2)
+
+                    // invaders 배열에 레이저 인덱스가 있다면 alienInvadersTakenDown에 추가하기
+
+                }
+
+                // 레이저는 빠르게 사라지기
+                if (currentLaserIndex2 < width) {
+                    clearInterval(laserId2)
+                    setTimeout(() => squares[currentLaserIndex2].classList.remove('laser2'), 100)
+                }
+            }
+            // setInterval(inshoot, 100)
+
+
+
+
+
+
+
+
+
+        }
+
+
+        document.addEventListener('keydown', shoot)
+
+        if(alienInvaders .length==0){
+            document.removeEventListener('keydown', inshoot)
+        }
+        if(alienInvaders.length>0)
+        document.addEventListener('keydown', inshoot)
+
+    });
+</script>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    body {
+        text-align: center;
+    }
+
+    #mycanvas {
+        background-color: white;
+        border: 1px solid;
+    }
+    button{
+        size: 20px;
+    }
+    
+   
+</style>
+
+<body>  
+    <h2 id="hed">space invaders</h2>
+    <canvas id="mycanvas"></canvas>
+    <button onclick="update()" value="재시작"></button>
+</body>
+
+</html>
+<script>
+    const result = document.querySelector("#hed");
+    let size = 32;//크기
+    let row = 16;// 행(가로)
+    let col = 16;//열 (세로)
+
+    let board;
+    let bwidth = size * col;//450
+    let bheight = size * row;//450
+    let context;
+
+    //shooter
+    let shipwidth = size * 2;
+    let shipheight = size * 2;
+    let shipX = size * col / 2 - size;
+    let shipY = size * row - size * 2;
+
+    let ship = {
+        x: shipX,
+        y: shipY,
+        width: shipwidth,
+        height: shipheight
+
+    }
+    //배
+    let shipimg;
+    let shipvelx = size;// 배 이동
+
+    //외계인 
+    let alienArray = [];
+    let alienWidth = size * 2;
+    // let alienWidth = size ;
+    let alienHeight = size;
+    let alienX = size;
+    let alienY = size;
+
+
+    let alienimg;
+    let alienRow = 3;//외계인 배열 행
+    let alienCol = 5;// 열 
+    let aliencnt = 1;//외계인 숫자 
+    let alienvelX = 1;//외계인 이동
+
+    //총알
+    let bulletArray = [];
+    let bulletvelY = -10;//위로 이동해야되서 음수 
+
+
+    let score = 0;
+    let gameover = false;
+
+
+
+    window.onload = function () {
+        board = document.getElementById('mycanvas')
+        context = board.getContext('2d')
+        board.width = bwidth
+        board.height = bheight
+
+        // 배 그리기
+        // context.fillStyle="green";
+        // context.fillRect(ship.x,ship.y,ship.width,ship.height)
+        shipimg = new Image();
+        shipimg.src = "/Gameproject/shoot.png";
+        shipimg.onload = function () {//배이미지 로드
+            context.drawImage(shipimg, ship.x, ship.y, ship.width, ship.height);
+        }
+
+        alienimg = new Image();
+        alienimg.src = "/Gameproject/pink.png";
+        // alienimg.src = "/d.jpg";
+        createAliens();
+
+        //애니메이션 프레임 요청
+        requestAnimationFrame(update);
+        document.addEventListener("keydown", moveship)// 키다운 되었을시 이벤트 발생 (함수 moveship 호출)
+        document.addEventListener("keydown", shoot)// 키다운 되었을시 이벤트 발생 (함수 shoot 호출)
+    }
+
+    function update() {
+        requestAnimationFrame(update);
+        // setInterval(update, 1)
+        //배 움직일시 이전움직임 초기화 => 캔버스 초기화
+        context.clearRect(0, 0, board.width, board.height)
+        //배 그리기
+        context.drawImage(shipimg, ship.x, ship.y, ship.width, ship.height);
+        //외계인 그리기
+        for (let i = 0; i < alienArray.length; i++) {
+            let alien = alienArray[i];
+            if (alien.alive) {
+                alien.x += alienvelX *2;//외계인 왼쪽 으로 이동
+                //외계인 테두리(캔버스 경계) 닿았을시 빠꾸 ? 
+                if (alien.x + alien.width >= board.width || alien.x <= 0) {
+                    alienvelX *= -1 // 오른쪽벽 경계 닿았을시 -1 -> 다시 왼쪽벽 경계닿았을시 -1*-1 =+1(오른쪽이동)
+                 
+                    // 외계인 아래로1행씩 이동
+                    for (let j = 0; j < alienArray.length; j++) {
+                        alienArray[j].y += alienHeight
+                    }
+                }  
+
+                context.drawImage(alienimg, alien.x, alien.y, alien.width, alien.height);
+
+                if (alien.y >= ship.y) {// 외계인의 y 좌표가 ship 의 y 좌표보다 크거나 같을떄 => 만났을때
+                    gameover = true;
+                }
+                
+
+            }
+        }
+        
+
+        //총알 그리기  
+        for (let i = 0; i < bulletArray.length; i++) {
+            let bullet = bulletArray[i];
+
+            bullet.y += bulletvelY;
+            context.fillStyle = "black";
+            context.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+
+            //총알 충돌 감지
+            for (let j = 0; j < alienArray.length; j++) {
+                let alien = alienArray[j];
+                if (!bullet.used && alien.alive && detectCollision(bullet, alien)) {
+                    bullet.used = true;
+                    alien.alive = false;
+                    aliencnt--;
+                    score+=100;
+                   console.log("점수"+score)
+                   console.log("수"+aliencnt)
+                   
+
+                }
+            }
+        }
+        if(aliencnt==0){// 외계인 숫자 0일시 게임종료 
+           gameover=true
+           
+       }
+        if (gameover) {
+            result.textContent = '게임 종료 '
+            return
+        }
+        
+       
+
+        context.fillStyle="black";
+        context.font="16px"
+        context.fillText(score, 5, 20);  
+       
+            if (gameover) {
+            result.textContent = '게임 종료 '
+            return
+        }
+        
+        
+
+    }
+    function moveship(e) {
+        if (gameover) {
+            result.textContent = '게임 종료 '
+            return
+        }
+
+        if (e.code == "ArrowLeft" && ship.x - shipvelx >= 0) { // 경계선
+            ship.x -= shipvelx;//왼쪽방향키 눌렀을시 왼쪽이동
+        } else if (e.code == "ArrowRight" && ship.x + shipvelx + ship.width <= board.width) {
+            ship.x += shipvelx;//오른쪽방향키 눌렀을시 오른쪽이동
+        }
+    }
+    function createAliens() {//외계인 생성
+        for (let c = 0; c < alienCol; c++) {
+            for (let r = 0; r < alienRow; r++) {
+                let alien = {
+                    img: alienimg,
+                    x: alienX + c * alienWidth,
+                    y: alienY + r * alienHeight,
+                    width: alienWidth,
+                    height: alienHeight,
+                    alive: true
+                }
+                alienArray.push(alien);
+
+            }
+        }
+        aliencnt = alienArray.length
+
+    }
+    function shoot(e) {
+        if (gameover) {
+            result.textContent = '게임 종료 '
+            return
+        }
+        
+        if (e.code == "Space") {// 스페이스바 눌렀을시 
+            let bullet = {
+                x: ship.x + shipwidth * 15 / 32,
+                y: ship.y,
+                width: size / 8,
+                height: size / 2,
+                used: false
+            }
+            bulletArray.push(bullet)
+        }
+    }
+    function detectCollision(Bullet, Alien) {
+        // 총알이 외계인의 범위내에 있어야할 경우 아래가 참이여야됨 
+        // 총알의 x 좌표 는 외계인의 x 좌표보다 커야됨
+        // 총알의 x 좌표는 외계인의 x 좌표 + width 보다 작아야됨 
+        // 총알의 y 좌표는 외계인의 y 좌표보다 커야됨
+        // 총알의 y 좌표는 외계인의 y 좌표 + height 보다 작아야됨 
+        return Bullet.x > Alien.x && Bullet.x < Alien.x + Alien.width && Bullet.y > Alien.y && Bullet.y < Alien.y + Alien.height;
+
+    }
+   
+
+
+
+</script>
